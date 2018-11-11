@@ -1,6 +1,7 @@
 Moonsound/Wozblaster Onboard RAM Tester
 ZX Version Copyright (C) 2015 Micklab
 MSX Version Copyright (C) 2015 Alexey Podrezov
+MSX Version Copyright (C) 2018 Volodymyr Bezobiuk
 
 
 DISCLAIMER

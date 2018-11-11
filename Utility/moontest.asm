@@ -5,11 +5,11 @@ cpu z80
 		ORG	0100h
 
 ;-------------------------------------------------------------------
-; описание: Точка входа в программу после передачи управления из ОС
+; РѕРїРёСЃР°РЅРёРµ: РўРѕС‡РєР° РІС…РѕРґР° РІ РїСЂРѕРіСЂР°РјРјСѓ РїРѕСЃР»Рµ РїРµСЂРµРґР°С‡Рё СѓРїСЂР°РІР»РµРЅРёСЏ РёР· РћРЎ
 ;---------------------------------------------------------------------
-Start:		DI
+Start:
 		RST	30H
-		DB	00	
+		DB	00
 		DW	06CH
 		RST	30H
 		DB	00	
@@ -17,309 +17,252 @@ Start:		DI
 		LD	de,TITLE	
 		call	print_string
 
-Card_detect:	call	init_card		;инициализация и проверка наличия карты
-		cp	a,0ffh
-		jp	z,card_not_found	;карта не найдена
+Card_detect:
+		call	init_card	;РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ Рё РїСЂРѕРІРµСЂРєР° РЅР°Р»РёС‡РёСЏ РєР°СЂС‚С‹
+		jp	nz,card_info	;РєР°СЂС‚Р° РЅР°Р№РґРµРЅР°
+
+        ld  de,NOCARD		; РєР°СЂС‚Р° РЅРµ РЅР°Р№РґРµРЅР°
+        call    print_string
+        jp  exit
 
 card_info:
-		ld	de,Blaster		;выведем информацию о чипе
+		ld	de,BLASTER		;РІС‹РІРµРґРµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ С‡РёРїРµ
 		call	print_string
 
-		ld	de,msg_Dev		;выведем информацию о чипе
+		ld	de,msg_Dev		;РІС‹РІРµРґРµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ С‡РёРїРµ
 		call	print_string
+		call	get_card_id
 		ld	de,id_ym278
-		ld	a,(dev_id)
 		cp	20h
-		jr	z,chip_0
+		jr	z,chip_ym278
 		ld	de,id_unk
-chip_0:
+chip_ym278:
 		call	print_string
 
-		ld	de,msg_ROM		;выведем информацию о ПЗУ
-		call	print_string
-		ld	de,mem_2048		
-		call	print_string
-		ld	de, msg_RAM		;выведем информацию о ОЗУ
+		ld	de,msg_ROM		;РІС‹РІРµРґРµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РџР—РЈ
 		call	print_string
 
-		ld	c,0				;признак что памяти нет
 
-		ld	de,0211h			;открываем ОЗУ на запись
-		call	wave_out
-	
-		ld	de,0320h			;устанавливаем адрес 200000h
-		call	wave_out
+		ld	de, msg_RAM		;РІС‹РІРµРґРµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РћР—РЈ
+		call	print_string
 
-		ld	de,0400h                        ;старший байт
-		call	wave_out		
-		inc	d                               ;05 - младший байт адреса
-		call	wave_out
-		ld	de,0655h                        ;06 -запишем данные -> 55h
-		call	wave_out		
-		call	busy		;проверим готовность микросхемы
-		ld	e,0AAh                          ;06 -запишем данные -> 0AAh
-		call	wave_out		
-		call	busy		;проверим готовность микросхемы
 
-		nop
-		nop
-		nop
-		nop
-		nop
-
-		ld	de,0211h			;открываем ОЗУ на чтение
-		call	wave_out
-		ld	de,0320h			;устанавливаем адрес 200000h
-		call	wave_out
-		ld	de,0400h                        ;старший байт
-		call	wave_out		
-		inc	d                               ;05 - младший байт адреса
-		call	wave_out
-		inc	d   
-		call	wave_in
-		ld	l,a
-		call	wave_in
-
-		cp	0AAh				;сравним что прочитали	
-		jr	nz, chip_1
-		ld	a,l
-		cp	55h				;сравним что прочитали	
-		jr	nz, chip_1
-		ld	a,1
-		or	c
-		ld	c,a
-chip_1:
-		ld	de,0211h			;открываем ОЗУ на запись
-		call	wave_out
-		ld	de,0328h			;устанавливаем адрес 280000h
+		ld b, 4		; start with 4 banks detected
+detect_ram:
+		ld a, b
+		dec a
+		add a,a
+		add a,a
+		add a,a
+		ld l, a
+		call Check_mem
+		jr z, detected_ram
+		djnz detect_ram
+detected_ram:
+		ld	de, 0210h			;Р·Р°РєСЂС‹РІР°РµРј РґРѕСЃС‚СѓРї Рє РћР—РЈ РєР°СЂС‚С‹
 		call	wave_out
 
-		ld	de,0400h                        ;старший байт
-		call	wave_out		
-		inc	d                               ;младший байт адреса
-		call	wave_out
-		ld	de,06AAh                        ;06 -запишем данные -> AAh
-		call	wave_out		
-		call	busy		;проверим готовность микросхемы
-		ld	e,55h                          	;06 -запишем данные -> 55h
-		call	wave_out		
-		call	busy		;проверим готовность микросхемы
-
-		nop
-		nop
-		nop
-		nop
-		nop
-
-		ld	de,0211h			;открываем ОЗУ на чтение
-		call	wave_out
-		ld	de,0328h			;устанавливаем адрес 280000h
-		call	wave_out
-		ld	de,0400h                        ;старший байт
-		call	wave_out		
-		inc	d                               ;05 - младший байт адреса
-		call	wave_out
-		inc	d   
-		call	wave_in
-		ld	l,a
-		call	wave_in
-
-		cp	55h				;сравним что прочитали	
-		jr	nz, chip_2
-		ld	a,l
-		cp	0AAh				;сравним что прочитали	
-		jr	nz, chip_2
-		ld	a,2
-		or	c
-		ld	c,a
-chip_2:
-		ld	a,c
+		ld a, b
 		ld	(dev_mem),a
-		ld	de,mem_none	
-		and	a
-		jr	z,chip_3
-		ld	de,mem_1024
-		cp	3
-		jr	z,chip_3
-		ld	de,mem_512
-chip_3:
-		call	print_string
-		ld	de, 0210h			;закрываем доступ к ОЗУ карты
-		call	wave_out
+		call print_small_int
+		ld de, msg_total
+		call print_string
+		ld hl, msg_total_x - 2
+		inc b
+_select_ram_msg:
+		inc hl
+		inc hl
+		djnz _select_ram_msg
+		ld e, (hl)
+		inc hl
+		ld d, (hl)
+		call print_string
 
-testram:        RST	30H
+        RST	30H
 		DB	0
 		DW	156H
-		call	test_ram
-
-exit:		LD	de,ENDING
+		ld  a, (dev_mem)
+		or a
+		jp nz, ram_found
+		ld	de,NORAM
 		call	print_string
-	        RST	30H
+		jp exit
+
+ram_found:
+		ld de, TESTING
+		call    print_string
+		call	test_ram
+		jp z, test_aborted_by_user
+		call	test_ram_update_pass
+		call	test_ram
+		jp z, test_aborted_by_user
+		call	test_ram_update_pass
+		call	test_ram
+		jp z, test_aborted_by_user
+		LD	de,COMPLETE
+		call	print_string
+		jp exit
+
+test_aborted_by_user:
+		LD  de,ABORTED
+		call    print_string
+
+exit:
+		LD	de,ENDING
+		call	print_string
+		RST	30H
 		DB	0
 		DW	156H
 		ret
 
 
+; L <- higher 5 bits 21-17 of the RAM address
+; E -> address bits normalized to the OPL4 RAm address
+; modify: AF
+_normalize_high_addr_bits:
+	ld a, l
+	and 01fh  ; take 5 high bits
+	or 20h  ; set the 6th bit (200000h) of address - RAM area
+	ld e, a
+	ret
+
+; L <- higher 5 bits 21-17 of the RAM address
+; ZF=1 memory detected,  ZF=0 memory not detected
+; modify: de, af, l
+Check_mem:
+		di
+		call    busy        ;РїСЂРѕРІРµСЂРёРј РіРѕС‚РѕРІРЅРѕСЃС‚СЊ РјРёРєСЂРѕСЃС…РµРјС‹
+		ld  de,0211h            ;РѕС‚РєСЂС‹РІР°РµРј РћР—РЈ РЅР° Р·Р°РїРёСЃСЊ
+		call    wave_out
+		inc d
+		call _normalize_high_addr_bits
+		push de
+		call    wave_out
+		ld  de,0400h		; set 00 for 15-8 bits of addr
+		call    wave_out
+		inc d		; same 00 for 7-0 bits of addr
+		call    wave_out
+		ld  de,0655h		; write the 55h to the address
+		call    wave_out
+		call    busy        ;РїСЂРѕРІРµСЂРёРј РіРѕС‚РѕРІРЅРѕСЃС‚СЊ РјРёРєСЂРѕСЃС…РµРјС‹
+		ld e,0AAh		; write AAh to the address
+		call    wave_out
+		; now try reading that back
+		call    busy        ;РїСЂРѕРІРµСЂРёРј РіРѕС‚РѕРІРЅРѕСЃС‚СЊ РјРёРєСЂРѕСЃС…РµРјС‹
+        nop
+        nop
+        nop
+        nop
+        nop
+		ld  de,0211h            ;РѕС‚РєСЂС‹РІР°РµРј РћР—РЈ РЅР° С‡С‚РµРЅРёРµ
+		call    wave_out
+		pop de
+		call    wave_out
+		ld  de,0400h        ; set 00 for 15-8 bits of addr
+		call    wave_out
+		inc d       ; same 00 for 7-0 bits of addr
+		call    wave_out
+		inc d
+		call    wave_in
+		cp  55h
+		jr nz, Check_mem_exit
+		call    wave_in
+		cp 0AAh
+Check_mem_exit:
+		ei
+		ret
+
 ;-------------------------------------------------------------------
-; описание: Печать строки на экране
-; параметры: de - адрес строки, hl - координаты
-; возвращаемое  значение: нет
+; РѕРїРёСЃР°РЅРёРµ: РџРµС‡Р°С‚СЊ СЃС‚СЂРѕРєРё РЅР° СЌРєСЂР°РЅРµ
+; РїР°СЂР°РјРµС‚СЂС‹: de - Р°РґСЂРµСЃ СЃС‚СЂРѕРєРё, hl - РєРѕРѕСЂРґРёРЅР°С‚С‹
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: РЅРµС‚
 ;---------------------------------------------------------------------
 print_string:	push	hl
 		push	bc
 		push	de
-do_print:	ld	c,9
+		ld	c,9
 		call	0005
 		pop	de
 		pop	bc
 		pop	hl
 		ret
 
+
+; A <- int (0 <= x <= 9)
+print_small_int:
+		add 30h		; and follow with print_char! (instead of call/jp)
 ;-------------------------------------------------------------------
-; описание: Печать символа на экране
-; параметры: a - символ
-; возвращаемое  значение: нет
+; РѕРїРёСЃР°РЅРёРµ: РџРµС‡Р°С‚СЊ СЃРёРјРІРѕР»Р° РЅР° СЌРєСЂР°РЅРµ
+; РїР°СЂР°РјРµС‚СЂС‹: a - СЃРёРјРІРѕР»
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: РЅРµС‚
 ;---------------------------------------------------------------------
-print_char:	push	hl
-		ld	hl,PRINTCHAR
-		ld	(hl),a
-		ex	de,hl
+print_char:
+		push	de
+		ld	de,PRINTCHAR
+		ld	(de),a
 		call	print_string
-		pop	hl
+		pop	de
 		ret
 
 
 ;-------------------------------------------------------------------
-; описание: Проверка нажатой клавиши
-; параметры: нет
-; возвращаемое  значение: нет
-;---------------------------------------------------------------------
-check_anykey:   RST	30H
-		DB	0
-		DW	9CH
-		ret
-
-;-------------------------------------------------------------------
-; описание: Вывод сообщения об отсутствии карты 
-; параметры: нет                                
-; возвращаемое  значение: нет
-;---------------------------------------------------------------------
-card_not_found:
-		ld	de,NOCARD
-		call	print_string        ;выведем сообщение
-		jp	exit
-
-;-------------------------------------------------------------------
-; описание: Вывод сообщения об отсутствии памяти ОЗУ
-; параметры: нет                                
-; возвращаемое  значение: нет
-;---------------------------------------------------------------------
-ram_not_found:
-		ld	de,NORAM
-		call	print_string        ;выведем сообщение
-		ret
-
-;-------------------------------------------------------------------
-; описание: Процесс тестирования ОЗУ
-; параметры: нет
-; возвращаемое  значение: нет
+; РѕРїРёСЃР°РЅРёРµ: РџСЂРѕС†РµСЃСЃ С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЏ РћР—РЈ
+; РїР°СЂР°РјРµС‚СЂС‹: РЅРµС‚
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: РЅРµС‚
 ;---------------------------------------------------------------------
 test_ram:
-		ld	a,(dev_mem)		;проверим наличие банков памяти
-		and	a
-		jp 	z,ram_not_found
-		LD	de,TESTING
-		call	print_string
-test_ram_loop:	xor	a
-		ld	hl,TESTFLAG
-		ld	(hl),a
+		ld hl, test_bank
+		ld b, 0
+		ld (hl), b				;B - РЅРѕРјРµСЂ Р±Р°РЅРєР°
 
-test_ram_00:	ld	(chk_byte),a
-		ld	a,(dev_mem)		;проверим наличие банка 0
-		and	1
-		jp 	z,test_ram_12
-		ld	hl,1030h
-		ld	bc,0000h			;B - номер банка, С - номер сегмента
-		LD	de,BANK1
-		call	print_string
-
-test_ram_0:	call	check_segment	;проверка одного сегмента
-		ld	a,RAMOK                           ;сегмент исправен
-		jp      z,test_ram_01
-		ld	a,RAMBAD				;сегмент неисправен
-		push	hl
-		ld	hl,TESTFLAG
-		inc	(hl)
-		pop	hl
-
-test_ram_01:	inc	c				;увеличим номер сегмента
-		push	bc
-		call	print_char
-		pop	bc
-		call	check_anykey
-		jp	nz,test_ram_6
-		ld	a,c
-		cp	20h
-		jp	nz,test_ram_0
-
-		ld	hl,TESTFLAG
-		ld	a,(hl)
-		or	a
-		jp	z,test_ram_02
-		LD	de,FAILED
-		call	print_string
-		jp	test_ram_12
-test_ram_02:	LD	de,PASSED
-		call	print_string
-
-test_ram_12:	ld	a,(dev_mem)		;проверим наличие банка 1
-		and	2
-		jp 	z,test_ram_32
-		ld	hl,8730h
-		ld	bc,0100h			;B - номер банка, С - номер сегмента
+test_ram_loop:
 		xor	a
-		push	hl
-		ld	hl,TESTFLAG
-		ld	(hl),a
-		pop	hl
-		LD	de,BANK2
-		call	print_string
+		ld	(TESTFLAG),a
 
-test_ram_2:	call	check_segment	;проверка одного сегмента
-		ld	a,RAMOK                           ;сегмент исправен
-		jp      z,test_ram_21
-		ld	a,RAMBAD				;сегмент неисправен
+		ld	hl,1030h
+		ld c, 0 				;РЎ - РЅРѕРјРµСЂ СЃРµРіРјРµРЅС‚Р°
+		LD	de, BANK
+		call	print_string
+		ld a, b
+		call print_small_int
+		LD  de, BANK_E
+		call    print_string
+
+test_ram_check_segment:
+		call	check_segment	;РїСЂРѕРІРµСЂРєР° РѕРґРЅРѕРіРѕ СЃРµРіРјРµРЅС‚Р°
+		ld	a,RAMOK                           ;СЃРµРіРјРµРЅС‚ РёСЃРїСЂР°РІРµРЅ
+		jp      z,test_ram_segment_ok
+		ld	a,RAMBAD				;СЃРµРіРјРµРЅС‚ РЅРµРёСЃРїСЂР°РІРµРЅ
 		push	hl
 		ld	hl,TESTFLAG
 		inc	(hl)
 		pop	hl
 
-test_ram_21:	inc	c				;увеличим номер сегмента
+test_ram_segment_ok:
+		inc	c				;СѓРІРµР»РёС‡РёРј РЅРѕРјРµСЂ СЃРµРіРјРµРЅС‚Р°
 		push	bc
 		call	print_char
 		pop	bc
-		call	check_anykey
-		jp	nz,test_ram_6
+		RST	30H
+		DB	0
+		DW  9CH  ;  check if key pressed
+		jp	nz,test_ram_abort
 		ld	a,c
 		cp	20h
-		jp	nz,test_ram_2
+		jp	nz,test_ram_check_segment
 
 		ld	hl,TESTFLAG
 		ld	a,(hl)
 		or	a
-		jp	z,test_ram_22
+		LD	de,PASSED
+		jp	z,test_ram_print_status
 		LD	de,FAILED
+test_ram_print_status:
 		call	print_string
-		jp	test_ram_32
-test_ram_22:	LD	de,PASSED
-		call	print_string
-		
-test_ram_32:	ld	hl,PASSED+13
-		inc	(hl)
-		ld	hl,FAILED+13
-		inc	(hl)
-		ld	hl,8000h			;пауза между тестами
-test_ram_33:	nop
+
+		ld	hl,8000h			;РїР°СѓР·Р° РјРµР¶РґСѓ С‚РµСЃС‚Р°РјРё
+test_ram_pause:
+		nop
 		nop
 		nop
 		nop
@@ -327,60 +270,76 @@ test_ram_33:	nop
 		dec	hl
 		ld	a,l
 		or	h
-		jr	nz,test_ram_33
+		jr	nz,test_ram_pause
 
-		ld	hl,NRUNS
-		dec	(hl)
-		ld	a,(hl)
-		or	a
-		jp	nz,test_ram_loop
+        ld a, (dev_mem)
+        ld hl, test_bank
+        inc (hl)
+		ld b, (hl)
+        cp b
+        jp nz, test_ram_loop
+
+		xor a
+		or	1	; set ZF = 0 before return
+		ret
 	
-test_ram_5:	LD	de,COMPLETE
-		call	print_string
+test_ram_abort:
+		xor a		; set ZF = 1 before return
 		ret
 
-test_ram_6:    	LD	de,ABORTED
-		call	print_string
+
+test_ram_update_pass:
+		ld	hl,PASSED_NUM
+		inc	(hl)
+		ld	hl,FAILED_NUM
+		inc	(hl)
 		ret
 
+
+_check_segment_normalize_addr:
+		ld	a,c
+		add	a,a
+		add	a,a
+		rrca
+		rrca
+		rrca
+		rrca
+		ld	l,a
+		and	0Fh
+		ld	h,a
+		ld	a,l
+		and	0F0h
+		ld	l,a
+		ret
+
+_check_segment_normalize_bank_addr:
+		ld  a,b
+        and 3
+        rlca
+        rlca
+        or  20h
+		or  h
+		ld  e,a
+		ret
+		
 
 ;-------------------------------------------------------------------
-; описание: Проверка одного сегмента RAM
-; параметры: B - номер банка
-;	     C - номер сегмента по 16Кб
-; возвращаемое  значение: Z = 1 исправен, Z = 0 неисправен
+; РѕРїРёСЃР°РЅРёРµ: РџСЂРѕРІРµСЂРєР° РѕРґРЅРѕРіРѕ СЃРµРіРјРµРЅС‚Р° RAM
+; РїР°СЂР°РјРµС‚СЂС‹: B - РЅРѕРјРµСЂ Р±Р°РЅРєР°
+;	     C - РЅРѕРјРµСЂ СЃРµРіРјРµРЅС‚Р° РїРѕ 16РљР±
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: Z = 1 РёСЃРїСЂР°РІРµРЅ, Z = 0 РЅРµРёСЃРїСЂР°РІРµРЅ
 ;---------------------------------------------------------------------
 check_segment:
 		push	hl
 		push	de
 		push	bc
-		ld	de,0211h			;запись в RAM
+		ld	de,0211h			;Р·Р°РїРёСЃСЊ РІ RAM
 		call	wave_out
 
-		ld	a,c
-		add	a,a
-		add	a,a
-		rrca
-		rrca
-		rrca
-		rrca
-		ld	l,a
-		and	0Fh
-		ld	h,a
-		ld	a,l
-		and	0F0h
-		ld	l,a
+		call _check_segment_normalize_addr
 
-		ld	a,b
-		ld	e,20h
-		and	a
-		jr	z,check_segment_0
-		ld	e,28h
+		call _check_segment_normalize_bank_addr
 
-check_segment_0:
-		ld	a,e
-		or	h
-		ld	e,a
 		inc	d
 		call	wave_out
 
@@ -392,48 +351,29 @@ check_segment_0:
 		inc	d
 
 		ld	hl,4000h
-		ld	a,(chk_byte)
+		ld	a,55h
 		ld	e,a
 
-check_segment_1:
+check_segment_write_loop:
 		call	wave_out
 		call	busy
-		inc	e
 
+		inc	e
 		dec	hl
 		ld	a,l
 		or	h
-		jr	nz,check_segment_1		
+		jr	nz,check_segment_write_loop		
+
 		pop	bc			
 
 		push	bc
-		ld	de,0211h			;чтение из RAM 
+		ld	de,0211h			;С‡С‚РµРЅРёРµ РёР· RAM 
 		call	wave_out
 
-		ld	a,c
-		add	a,a
-		add	a,a
-		rrca
-		rrca
-		rrca
-		rrca
-		ld	l,a
-		and	0Fh
-		ld	h,a
-		ld	a,l
-		and	0F0h
-		ld	l,a
+		call _check_segment_normalize_addr
 
-		ld	a,b
-		ld	e,20h
-		and	a
-		jr	z,check_segment_3
-		ld	e,28h
+        call _check_segment_normalize_bank_addr
 
-check_segment_3:
-		ld	a,e
-		or	h
-		ld	e,a
 		inc	d
 		call	wave_out
 
@@ -445,22 +385,22 @@ check_segment_3:
 		inc	d
 
 		ld	hl,4000h
-		ld	a,(chk_byte)
+		ld	a,55h
 		ld	e,a
 
-check_segment_4:
+check_segment_read_loop:
 		call	wave_in
 		cp	e
-		jr	nz,check_segment_5
+		jr	nz,check_segment_exit
 
 		inc	e
 		dec	hl
 		ld	a,l
 		or	h
-		jr	nz,check_segment_4
+		jr	nz,check_segment_read_loop
 
-check_segment_5:
-		ld	de,0210h			;Отключаем доступ к RAM
+check_segment_exit:
+		ld	de,0210h			;РћС‚РєР»СЋС‡Р°РµРј РґРѕСЃС‚СѓРї Рє RAM
 		call	wave_out
 		pop	bc					
 		pop	de
@@ -468,18 +408,16 @@ check_segment_5:
 		ret	
 
 ;-------------------------------------------------------------------
-; описание: Инициализация карты ZXM-Moonsound
-; параметры: нет
-; возвращаемое  значение: A - 0 нет ошибок, иначе ошибка
+; РѕРїРёСЃР°РЅРёРµ: РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РєР°СЂС‚С‹ OPL4
+; РїР°СЂР°РјРµС‚СЂС‹: РЅРµС‚
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: ZF=1 - РѕС€РёР±РєР°, РёРЅР°С‡Рµ РІСЃРµ РѕРє
 ;---------------------------------------------------------------------
 init_card:
-
-		in	a,(WB_STAT)                       ;проверяем наличие карты
-		cp	0FFh
-		jp	nz,init_0
-		ret	
-
-init_0:
+		in	a,(WB_STAT)                       ;РїСЂРѕРІРµСЂСЏРµРј РЅР°Р»РёС‡РёРµ РєР°СЂС‚С‹
+		inc a
+		ret	z		; WB_STAT port returned FFh
+		; all operations below (fm1_out, fm2_out, wave_out) doesn't
+		; change the flags so it is safe to just return afterwards with ZF=0
 		ld	de, 0400h 
 		call	fm2_out
 		ld	de, 0503h			; set 1 to NEW2, NEW
@@ -488,18 +426,20 @@ init_0:
 		call	fm1_out
 		ld	de, 0210h			; Set WaveTable header
 		call	wave_out
-		
-		in	a,(WB_WDAT)			;получим ID девайса
-		and	0E0h
-		ld	(dev_id),a
-		xor	a
-		ret	
+		ret
+
+get_card_id:
+		in  a,(WB_WDAT)         ;РїРѕР»СѓС‡РёРј ID РґРµРІР°Р№СЃР°
+		and 0E0h
+		ld  (dev_id),a
+		ret
+
 
 ;-------------------------------------------------------------------
-; описание: Запись в регистры fm1
-; параметры: D = адрес регистра 
-;	     E = данные
-; возвращаемое  значение: нет
+; РѕРїРёСЃР°РЅРёРµ: Р—Р°РїРёСЃСЊ РІ СЂРµРіРёСЃС‚СЂС‹ fm1
+; РїР°СЂР°РјРµС‚СЂС‹: D = Р°РґСЂРµСЃ СЂРµРіРёСЃС‚СЂР° 
+;	     E = РґР°РЅРЅС‹Рµ
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: РЅРµС‚
 ;-------------------------------------------------------------------
 fm1_out:
 		ld	a, d
@@ -516,10 +456,10 @@ fm1_out:
 		ret
 
 ;-------------------------------------------------------------------
-; описание: Запись в регистры fm2
-; параметры: D = адрес регистра 
-;	     E = данные
-; возвращаемое  значение: нет
+; РѕРїРёСЃР°РЅРёРµ: Р—Р°РїРёСЃСЊ РІ СЂРµРіРёСЃС‚СЂС‹ fm2
+; РїР°СЂР°РјРµС‚СЂС‹: D = Р°РґСЂРµСЃ СЂРµРіРёСЃС‚СЂР° 
+;	     E = РґР°РЅРЅС‹Рµ
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: РЅРµС‚
 ;-------------------------------------------------------------------
 fm2_out:
 		ld	a,d
@@ -536,10 +476,10 @@ fm2_out:
 		ret
 
 ;-------------------------------------------------------------------
-; описание: Запись в регистры Wave
-; параметры: D = адрес регистра 
-;	     E = данные
-; возвращаемое  значение: нет
+; РѕРїРёСЃР°РЅРёРµ: Р—Р°РїРёСЃСЊ РІ СЂРµРіРёСЃС‚СЂС‹ Wave
+; РїР°СЂР°РјРµС‚СЂС‹: D = Р°РґСЂРµСЃ СЂРµРіРёСЃС‚СЂР° 
+;	     E = РґР°РЅРЅС‹Рµ
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: РЅРµС‚
 ;-------------------------------------------------------------------
 wave_out:
 		ld	a, d
@@ -556,9 +496,9 @@ wave_out:
 		ret
 
 ;-------------------------------------------------------------------
-; описание: Чтение из регистра Wave
-; параметры: D = адрес регистра 
-; возвращаемое  значение: А - данные
+; РѕРїРёСЃР°РЅРёРµ: Р§С‚РµРЅРёРµ РёР· СЂРµРіРёСЃС‚СЂР° Wave
+; РїР°СЂР°РјРµС‚СЂС‹: D = Р°РґСЂРµСЃ СЂРµРіРёСЃС‚СЂР° 
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: Рђ - РґР°РЅРЅС‹Рµ
 ;-------------------------------------------------------------------
 wave_in:
 		ld	a, d
@@ -574,9 +514,9 @@ wave_in:
 		ret
 
 ;-------------------------------------------------------------------
-; описание: Ожидание готовности микросхемы
-; параметры: нет
-; возвращаемое  значение: нет
+; РѕРїРёСЃР°РЅРёРµ: РћР¶РёРґР°РЅРёРµ РіРѕС‚РѕРІРЅРѕСЃС‚Рё РјРёРєСЂРѕСЃС…РµРјС‹
+; РїР°СЂР°РјРµС‚СЂС‹: РЅРµС‚
+; РІРѕР·РІСЂР°С‰Р°РµРјРѕРµ  Р·РЅР°С‡РµРЅРёРµ: РЅРµС‚
 ;-------------------------------------------------------------------
 busy:		nop
 		nop
@@ -594,38 +534,48 @@ busy:		nop
 
 
 ;-------------------------------------------------------------------
-; описание: Сообщения о ошибках
+; РѕРїРёСЃР°РЅРёРµ: РЎРѕРѕР±С‰РµРЅРёСЏ Рѕ РѕС€РёР±РєР°С…
 ;---------------------------------------------------------------------
 NOCARD:		DB 	"Moonsound/Wozblaster is not detected!",10,13,"$"
 NORAM:		DB 	10,13,"This Moonsound/Wozblaster doesn't have any RAM!",10,13,"$"
 
 ;-------------------------------------------------------------------
-; описание: Информационные сообщения  
+; РѕРїРёСЃР°РЅРёРµ: РРЅС„РѕСЂРјР°С†РёРѕРЅРЅС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏ  
 ;---------------------------------------------------------------------
-TITLE: 		DB	"Moonsound/Wozblaster Onboard RAM Tester v1.0",10,13,"ZX Version Copyright (C) 2015 Micklab",10,13,"MSX Version Copyright (C) 2015 Alexey Podrezov",10,13,10,13,"$"
-PRINTCHAR:	DB	" $"
+TITLE: 		DB	"Moonsound/Wozblaster Onboard RAM Tester v1.0",10,13
+			DB	"ZX Version Copyright (C) 2015 Micklab",10,13
+			DB	"MSX Version Copyright (C) 2015 Alexey Podrezov",10,13
+			DB	"MSX Version Copyright (C) 2018 Volodymyr Bezobiuk",10,13
+			DB	10,13,"$"
 BLASTER: 	DB	"Currently installed Moonsound/Wozblaster:",10,13,10,13,"$"
-ENDING:		DB	10,13,"Thanks for using the Moonsound/Wozblaster Onboard RAM Tester!",10,13,"Please check the README.TXT file for more info.",10,13,"$"
-TESTING:	DB	10,13,"Starting 3 RAM tests, press any key to stop testing.",10,13,"$"
-ABORTED:	DB	10,13,"The test was stopped by a user...",10,13,"$"
-COMPLETE:	DB	10,13,"The test is complete...",10,13,"$"
-BANK1:		DB	" BANK1 (512 kb): $"
-BANK2:		DB	" BANK2 (512 kb): $"
-CRLF:		DB	10,13,"$"
-PASSED:		DB	" PASSED (try 1)",10,13,"$"
-FAILED:		DB	" FAILED (try 1)",10,13,"$"
+ENDING:		DB	10,13,"Thanks for using the Moonsound/"
+			DB	"Wozblaster Onboard RAM Tester!",10,13
+			DB	"Please check the README.TXT file for more info.",10,13,"$"
+TESTING:	DB	10,13,"Starting 3 RAM tests, press any key to interrupt testing.",10,13,"$"
+ABORTED:	DB	10,13,10,13,"Test interrupted by user...",10,13,"$"
+COMPLETE:	DB	10,13,10,13,"Test completed.",10,13,"$"
+BANK:		DB  " BANK $"
+BANK_E:		DB	": $"
+PASSED:		DB	" PASSED (try "
+PASSED_NUM:	DB	"1)",10,13,"$"
+FAILED:		DB	" FAILED (try "
+FAILED_NUM:	DB	"1)",10,13,"$"
+PRINTCHAR:	DB	" $"
 
 id_unk:		DB 	"Unknown",10,13,"$"
 id_ym278:	DB 	"Yamaha YMF278",10,13,"$"
 
-mem_none:	DB 	"None",10,13,"$"
-mem_512:	DB 	"512 kb",10,13,"$"
-mem_1024:	DB 	"1024 kb",10,13,"$"
-mem_2048:	DB 	"2048 kb",10,13,"$"
-
 msg_Dev:	DB 	" OPL chip: $"
 msg_RAM:	DB 	" RAM size: $"
-msg_ROM:	DB 	" ROM size: $"
+msg_ROM:	DB 	" ROM size: 2048K",10,13,"$"
+
+msg_total	DB  " x 512K = $"
+msg_total_0	DB	"no RAM installed$"
+msg_total_1	DB	"512K",10,13,"$"
+msg_total_2	DB	"1024K",10,13,"$"
+msg_total_3	DB	"1536K",10,13,"$"
+msg_total_4	DB	"2048K",10,13,"$"
+msg_total_x	DW	msg_total_0, msg_total_1, msg_total_2, msg_total_3, msg_total_4
 
 RAMOK:		EQU	"."
 RAMBAD:		EQU	"x"
@@ -642,8 +592,8 @@ WB_WDAT:	EQU	WB_WREG+1
 
 dev_id:		DB	0
 dev_mem:	DB	0
-chk_byte:	DB	0
+test_bank:	DB	0
 TESTFLAG:	DB	0
-NRUNS:		DB	3
 
 ;		END
+
